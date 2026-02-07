@@ -19,6 +19,7 @@ from src.utils.visualise import (
     plot_prediction_heatmap
 )
 
+
 def main():
     print("CNN Trade Execution Prediction")
 
