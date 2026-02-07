@@ -9,6 +9,7 @@ from tensorflow import keras
 from src.data.data_acquisition import download_nasdaq_data
 from src.feature_engineering.engineering import create_sliding_windows, prepare_train_test_split
 from src.model.model import build_cnn_model
+from src.utils.visualise import plot_training_history, evaluate_predictions
 
 def main():
     print("CNN Pipeline")
@@ -25,7 +26,6 @@ def main():
         'batch_size': 64
     }
     
-    print("download exec data")
     print(f"Symbols: {', '.join(config['symbols'])}")
     print(f"Date range: {config['start_date'].date()} to {config['end_date'].date()}")
     
@@ -35,10 +35,12 @@ def main():
         end_date=config['end_date'],
         output_file=config['output_file']
     )
-
+    print(f"{len(df):,} trades")
+    
     all_X, all_y, all_symbols = [], [], []
     
     for symbol in df['symbol'].unique():
+        print(f"\nProcessing {symbol}...")
         df_symbol = df[df['symbol'] == symbol].copy()
         
         X, y = create_sliding_windows(
@@ -57,24 +59,21 @@ def main():
     X_combined = np.vstack(all_X)
     y_combined = np.hstack(all_y)
     
-    print(f"Total windows: {len(X_combined):,}")
+    print(f"\nTotal windows: {len(X_combined):,}")
     print(f"Input shape: {X_combined.shape}")
-    print(f"Target shape: {y_combined.shape}")
     
     X_train, X_test, y_train, y_test = prepare_train_test_split(
         X_combined,
         y_combined,
         train_ratio=config['train_test_split']
     )
+    print(f"Training: {len(X_train):,} | Test: {len(X_test):,}")
     
     input_shape = (X_train.shape[1], X_train.shape[2])
     model = build_cnn_model(input_shape)
     
     print(f"Model input shape: {input_shape}")
     model.summary()
-    
-    print(f"Epochs: {config['epochs']}")
-    print(f"Batch size: {config['batch_size']}")
     
     early_stop = keras.callbacks.EarlyStopping(
         monitor='val_loss', 
@@ -89,6 +88,7 @@ def main():
         min_lr=0.00001
     )
     
+    print(f"\nTraining: {config['epochs']} epochs, batch size {config['batch_size']}")
     history = model.fit(
         X_train, y_train,
         validation_split=0.2,
@@ -115,22 +115,25 @@ def main():
         y_test=y_test,
         symbols=all_symbols
     )
-
     model.save('nasdaq_cnn_model.h5')
-    print("Saved nasdaq_cnn_model.h5")
     
     np.save('training_history.npy', history.history)
-    print("\nSaved training_history.npy")
     
-    print(f"Total trades downloaded: {len(df):,}")
+    plot_training_history(history)
+    
+    y_pred_proba = model.predict(X_test, verbose=0)
+    y_pred = (y_pred_proba > 0.5).astype(int).flatten()
+    evaluate_predictions(y_test, y_pred)
+ 
+    print(f"\nTotal trades: {len(df):,}")
     print(f"Training windows: {len(X_train):,}")
     print(f"Test windows: {len(X_test):,}")
-    print(f"Features per window: {X_train.shape[2]}")
+    print(f"Features: {X_train.shape[2]}")
     print(f"Window size: {X_train.shape[1]} trades")
     print(f"\nModel Performance:")
-    print(f"  Accuracy: {test_acc:.2%}")
+    print(f"  Accuracy:  {test_acc:.2%}")
     print(f"  Precision: {test_precision:.2%}")
-    print(f"  Recall: {test_recall:.2%}")
+    print(f"  Recall:    {test_recall:.2%}")
     
     return model, history, X_train, X_test, y_train, y_test
 
