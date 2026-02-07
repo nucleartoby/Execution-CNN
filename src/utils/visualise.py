@@ -1,8 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
+
 from sklearn.metrics import confusion_matrix, classification_report, ConfusionMatrixDisplay
 from sklearn.metrics import roc_curve, auc, precision_recall_curve, average_precision_score
+
 
 def plot_training_history(history):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
@@ -25,7 +27,8 @@ def plot_training_history(history):
     
     plt.tight_layout()
     plt.savefig('training_history.png', dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
+
 
 def evaluate_predictions(y_test, y_pred):
     cm = confusion_matrix(y_test, y_pred)
@@ -37,7 +40,7 @@ def evaluate_predictions(y_test, y_pred):
     
     plt.tight_layout()
     plt.savefig('confusion_matrix.png', dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
     
     print(classification_report(y_test, y_pred, target_names=['Down', 'Up']))
     
@@ -47,6 +50,7 @@ def evaluate_predictions(y_test, y_pred):
     
     print(f"  Predicted Up:   {up_predictions:,} ({up_predictions/len(y_pred)*100:.1f}%)")
     print(f"  Predicted Down: {down_predictions:,} ({down_predictions/len(y_pred)*100:.1f}%)")
+
 
 def plot_prediction_confidence(y_test, y_pred_proba):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
@@ -59,8 +63,11 @@ def plot_prediction_confidence(y_test, y_pred_proba):
     ax1.legend()
     ax1.grid(True, alpha=0.3)
     
-    correct = y_pred_proba[y_test == ((y_pred_proba > 0.5).astype(int).flatten())]
-    incorrect = y_pred_proba[y_test != ((y_pred_proba > 0.5).astype(int).flatten())]
+    y_pred_binary = (y_pred_proba > 0.5).astype(int).flatten()
+    correct_mask = (y_test == y_pred_binary)
+    
+    correct = y_pred_proba[correct_mask]
+    incorrect = y_pred_proba[~correct_mask]
     
     ax2.hist(correct, bins=30, alpha=0.7, label='Correct', color='green', edgecolor='black')
     ax2.hist(incorrect, bins=30, alpha=0.7, label='Incorrect', color='red', edgecolor='black')
@@ -73,34 +80,45 @@ def plot_prediction_confidence(y_test, y_pred_proba):
     plt.tight_layout()
     plt.savefig('prediction_confidence.png', dpi=300, bbox_inches='tight')
     print("Saved prediction_confidence.png")
-    plt.show()
+    plt.close()
+
 
 def plot_predictions_over_time(y_test, y_pred, y_pred_proba, sample_size=500):
-    subset = slice(0, sample_size)
+    actual_size = min(sample_size, len(y_test))
+    subset = slice(0, actual_size)
     
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 8), sharex=True)
     
-    x = np.arange(len(y_test[subset]))
-    ax1.scatter(x[y_test[subset] == 1], np.ones(sum(y_test[subset])), 
+    x = np.arange(actual_size)
+    y_test_sub = y_test[subset]
+    y_pred_sub = y_pred[subset]
+    y_pred_proba_sub = y_pred_proba[subset].flatten()
+    
+    up_mask = y_test_sub == 1
+    down_mask = y_test_sub == 0
+    ax1.scatter(x[up_mask], np.ones(sum(up_mask)), 
                 color='green', marker='^', s=50, label='Actual Up', alpha=0.6)
-    ax1.scatter(x[y_test[subset] == 0], np.zeros(sum(y_test[subset] == 0)), 
+    ax1.scatter(x[down_mask], np.zeros(sum(down_mask)), 
                 color='red', marker='v', s=50, label='Actual Down', alpha=0.6)
-    ax1.scatter(x[y_pred[subset] == 1], np.ones(sum(y_pred[subset])) + 0.1, 
+    
+    pred_up_mask = y_pred_sub == 1
+    pred_down_mask = y_pred_sub == 0
+    ax1.scatter(x[pred_up_mask], np.ones(sum(pred_up_mask)) + 0.1, 
                 color='blue', marker='o', s=30, label='Predicted Up', alpha=0.4)
-    ax1.scatter(x[y_pred[subset] == 0], np.zeros(sum(y_pred[subset] == 0)) + 0.1, 
+    ax1.scatter(x[pred_down_mask], np.zeros(sum(pred_down_mask)) + 0.1, 
                 color='orange', marker='o', s=30, label='Predicted Down', alpha=0.4)
     ax1.set_ylabel('Direction')
     ax1.set_title('Predictions vs Actual Over Time')
     ax1.legend()
     ax1.grid(True, alpha=0.3)
     
-    ax2.plot(y_pred_proba[subset], linewidth=1, alpha=0.8)
+    ax2.plot(y_pred_proba_sub, linewidth=1, alpha=0.8)
     ax2.axhline(0.5, color='red', linestyle='--', label='Decision Threshold')
-    ax2.fill_between(x, 0.5, y_pred_proba[subset].flatten(), 
-                     where=y_pred_proba[subset].flatten() > 0.5, 
+    ax2.fill_between(x, 0.5, y_pred_proba_sub, 
+                     where=y_pred_proba_sub > 0.5, 
                      alpha=0.3, color='green', label='Up Confidence')
-    ax2.fill_between(x, y_pred_proba[subset].flatten(), 0.5, 
-                     where=y_pred_proba[subset].flatten() < 0.5, 
+    ax2.fill_between(x, y_pred_proba_sub, 0.5, 
+                     where=y_pred_proba_sub < 0.5, 
                      alpha=0.3, color='red', label='Down Confidence')
     ax2.set_xlabel('Sample Index')
     ax2.set_ylabel('Predicted Probability (Up)')
@@ -110,12 +128,15 @@ def plot_predictions_over_time(y_test, y_pred, y_pred_proba, sample_size=500):
     
     plt.tight_layout()
     plt.savefig('predictions_time_series.png', dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
+
 
 def plot_performance_curves(y_test, y_pred_proba):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
     
-    fpr, tpr, thresholds_roc = roc_curve(y_test, y_pred_proba)
+    y_pred_proba_flat = y_pred_proba.flatten()
+    
+    fpr, tpr, thresholds_roc = roc_curve(y_test, y_pred_proba_flat)
     roc_auc = auc(fpr, tpr)
     
     ax1.plot(fpr, tpr, linewidth=2, label=f'ROC (AUC = {roc_auc:.3f})')
@@ -126,8 +147,9 @@ def plot_performance_curves(y_test, y_pred_proba):
     ax1.legend()
     ax1.grid(True, alpha=0.3)
     
-    precision, recall, thresholds_pr = precision_recall_curve(y_test, y_pred_proba)
-    avg_precision = average_precision_score(y_test, y_pred_proba)
+    # Precision-Recall curve
+    precision, recall, thresholds_pr = precision_recall_curve(y_test, y_pred_proba_flat)
+    avg_precision = average_precision_score(y_test, y_pred_proba_flat)
     
     ax2.plot(recall, precision, linewidth=2, label=f'PR (AP = {avg_precision:.3f})')
     ax2.axhline(y=y_test.mean(), color='k', linestyle='--', 
@@ -140,17 +162,20 @@ def plot_performance_curves(y_test, y_pred_proba):
     
     plt.tight_layout()
     plt.savefig('performance_curves.png', dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
+
 
 def analyse_feature_importance(model, X_test, feature_names):
-    sample_size = 100
+    sample_size = min(100, len(X_test))
     X_sample = X_test[:sample_size]
     
-    with tf.GradientTape() as tape:
-        tape.watch(X_sample)
-        predictions = model(X_sample)
+    X_sample_tensor = tf.convert_to_tensor(X_sample, dtype=tf.float32)
     
-    gradients = tape.gradient(predictions, X_sample)
+    with tf.GradientTape() as tape:
+        tape.watch(X_sample_tensor)
+        predictions = model(X_sample_tensor, training=False)
+    
+    gradients = tape.gradient(predictions, X_sample_tensor)
     
     importance = np.abs(gradients.numpy()).mean(axis=(0, 1))
     
@@ -165,11 +190,19 @@ def analyse_feature_importance(model, X_test, feature_names):
     
     plt.tight_layout()
     plt.savefig('feature_importance.png', dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
+    
+    print("Saved feature_importance.png")
+
 
 def plot_prediction_heatmap(y_test, y_pred, sample_size=1000):
     batch_size = 50
-    n_batches = min(sample_size, len(y_test)) // batch_size
+    actual_size = min(sample_size, len(y_test))
+    n_batches = actual_size // batch_size
+    
+    if n_batches == 0:
+        print("Not enough data for heatmap")
+        return
     
     correct = (y_test[:n_batches*batch_size] == y_pred[:n_batches*batch_size]).astype(int)
     heatmap_data = correct.reshape(n_batches, batch_size)
@@ -186,4 +219,4 @@ def plot_prediction_heatmap(y_test, y_pred, sample_size=1000):
     
     plt.tight_layout()
     plt.savefig('prediction_heatmap.png', dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
