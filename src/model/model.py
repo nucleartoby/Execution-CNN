@@ -2,6 +2,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 
+
 def build_cnn_model(input_shape):
     model = keras.Sequential([
 
