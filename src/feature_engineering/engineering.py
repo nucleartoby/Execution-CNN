@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
+
 def create_sliding_windows(df, window_size=100, prediction_horizon=50):
     df = df.copy()
     df['price_change'] = df['price'].pct_change()
@@ -26,6 +27,7 @@ def create_sliding_windows(df, window_size=100, prediction_horizon=50):
         y.append(target)
     
     return np.array(X), np.array(y)
+
 
 def prepare_train_test_split(X, y, train_ratio=0.8):
     split_idx = int(len(X) * train_ratio)
