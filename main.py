@@ -9,11 +9,19 @@ from tensorflow import keras
 from src.data.data_acquisition import download_nasdaq_data
 from src.feature_engineering.engineering import create_sliding_windows, prepare_train_test_split
 from src.model.model import build_cnn_model
-from src.utils.visualise import plot_training_history, evaluate_predictions
+from src.utils.visualise import (
+    plot_training_history, 
+    evaluate_predictions,
+    plot_prediction_confidence,
+    plot_predictions_over_time,
+    plot_performance_curves,
+    analyse_feature_importance,
+    plot_prediction_heatmap
+)
 
 def main():
-    print("CNN Pipeline")
-    
+    print("CNN Trade Execution Prediction")
+
     config = {
         'symbols': ["ANET"],
         'start_date': datetime(2026, 2, 2),
@@ -26,6 +34,9 @@ def main():
         'batch_size': 64
     }
     
+    feature_names = ['price', 'size', 'price_change', 'volume_ma', 
+                     'price_volatility', 'trade_intensity']
+
     print(f"Symbols: {', '.join(config['symbols'])}")
     print(f"Date range: {config['start_date'].date()} to {config['end_date'].date()}")
     
@@ -36,7 +47,6 @@ def main():
         output_file=config['output_file']
     )
     print(f"{len(df):,} trades")
-    
     all_X, all_y, all_symbols = [], [], []
     
     for symbol in df['symbol'].unique():
@@ -74,7 +84,7 @@ def main():
     
     print(f"Model input shape: {input_shape}")
     model.summary()
-    
+
     early_stop = keras.callbacks.EarlyStopping(
         monitor='val_loss', 
         patience=10, 
@@ -88,7 +98,7 @@ def main():
         min_lr=0.00001
     )
     
-    print(f"\nTraining: {config['epochs']} epochs, batch size {config['batch_size']}")
+    print(f"Epochs: {config['epochs']}, Batch size: {config['batch_size']}")
     history = model.fit(
         X_train, y_train,
         validation_split=0.2,
@@ -115,17 +125,23 @@ def main():
         y_test=y_test,
         symbols=all_symbols
     )
+
     model.save('nasdaq_cnn_model.h5')
-    
+
     np.save('training_history.npy', history.history)
-    
-    plot_training_history(history)
-    
+
     y_pred_proba = model.predict(X_test, verbose=0)
     y_pred = (y_pred_proba > 0.5).astype(int).flatten()
+    
+    plot_training_history(history)
     evaluate_predictions(y_test, y_pred)
- 
-    print(f"\nTotal trades: {len(df):,}")
+    plot_prediction_confidence(y_test, y_pred_proba)
+    plot_predictions_over_time(y_test, y_pred, y_pred_proba, sample_size=500)
+    plot_performance_curves(y_test, y_pred_proba)
+    analyse_feature_importance(model, X_test, feature_names)
+    plot_prediction_heatmap(y_test, y_pred, sample_size=1000)
+
+    print(f"Total trades: {len(df):,}")
     print(f"Training windows: {len(X_train):,}")
     print(f"Test windows: {len(X_test):,}")
     print(f"Features: {X_train.shape[2]}")
@@ -134,7 +150,7 @@ def main():
     print(f"  Accuracy:  {test_acc:.2%}")
     print(f"  Precision: {test_precision:.2%}")
     print(f"  Recall:    {test_recall:.2%}")
-    
+ 
     return model, history, X_train, X_test, y_train, y_test
 
 if __name__ == "__main__":
