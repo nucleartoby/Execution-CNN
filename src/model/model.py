@@ -29,7 +29,7 @@ def build_cnn_model(input_shape):
     ])
     
     model.compile(
-        optimiser=keras.optimizers.Adam(learning_rate=0.001),
+        optimizer=keras.optimizers.Adam(learning_rate=0.001),
         loss='binary_crossentropy',
         metrics=['accuracy', keras.metrics.Precision(), keras.metrics.Recall()]
     )
