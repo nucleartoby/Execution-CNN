@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
 
-def create_sliding_windows(df, window_size=100, prediction_horizon=50):
+def create_sliding_windows(df, window_size=100, prediction_horizon=500):
     df = df.copy()
     df['price_change'] = df['price'].pct_change()
     df['volume_ma'] = df['size'].rolling(window=20).mean()
