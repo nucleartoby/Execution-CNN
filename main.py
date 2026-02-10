@@ -24,7 +24,7 @@ def main():
     print("CNN Trade Execution Prediction")
 
     config = {
-        'symbols': ["ANET"],
+        'symbols': ["MSTR"],
         'start_date': datetime(2026, 2, 2),
         'end_date': datetime(2026, 2, 6),
         'output_file': 'nasdaq_top10_trades.csv',
