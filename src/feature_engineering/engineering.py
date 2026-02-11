@@ -8,7 +8,11 @@ def create_sliding_windows(df, window_size=100, prediction_horizon=500):
     df['price_change'] = df['price'].pct_change()
     df['volume_ma'] = df['size'].rolling(window=20).mean()
     df['price_volatility'] = df['price'].rolling(window=20).std()
-    df['trade_intensity'] = df['size'] / df['size'].rolling(window=50).mean()
+    df['trade_intensity'] = df['size'] / df['size'].rolling(window=20).mean()
+
+    df['price_ma_5'] = df['price'].rolling(window=5).mean()
+    df['price_ma_20'] = df['price'].rolling(window=20).mean()
+    df['ma_crossover'] = (df['price_ma_5'] > df['price_ma_20']).astype(int)
     
     df = df.dropna()
     
