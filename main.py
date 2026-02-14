@@ -9,7 +9,7 @@ from src.data.data_acquisition import download_nasdaq_data
 from src.feature_engineering.engineering import create_sliding_windows, prepare_train_test_split
 from src.model.model import build_cnn_model
 from src.model.train import prepare_training_data, train_model, get_callbacks
-# from src.model.evaluate import evaluate_model
+from src.model.evaluate import evaluate_model
 from src.utils.visualise import (
     plot_training_history, 
     evaluate_predictions,
