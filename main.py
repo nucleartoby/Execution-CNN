@@ -1,9 +1,7 @@
 import os
 import sys
 from datetime import datetime
-import pandas as pd
 import numpy as np
-from tensorflow import keras
 
 from src.data.data_acquisition import download_nasdaq_data
 from src.feature_engineering.engineering import create_sliding_windows, prepare_train_test_split
@@ -109,7 +107,6 @@ def main():
     print("Pipeline Complete")
     print(f"ROC AUC: {metrics['roc_auc']:.4f}")
     print(f"Accuracy: {metrics['accuracy']:.2%}")
-    print("="*60)
     
     return model, history, metrics
 
