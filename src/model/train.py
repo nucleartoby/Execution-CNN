@@ -94,9 +94,7 @@ def train_with_cross_validation(model_builder, X, y, n_folds=5, epochs=50, batch
     models = []
     
     for fold, (train_idx, val_idx) in enumerate(tscv.split(X), 1):
-        print(f"\n{'='*60}")
         print(f"Fold {fold}/{n_folds}")
-        print(f"{'='*60}")
         
         X_train_fold, X_val_fold = X[train_idx], X[val_idx]
         y_train_fold, y_val_fold = y[train_idx], y[val_idx]
