@@ -147,7 +147,6 @@ def plot_performance_curves(y_test, y_pred_proba):
     ax1.legend()
     ax1.grid(True, alpha=0.3)
     
-    # Precision-Recall curve
     precision, recall, thresholds_pr = precision_recall_curve(y_test, y_pred_proba_flat)
     avg_precision = average_precision_score(y_test, y_pred_proba_flat)
     
