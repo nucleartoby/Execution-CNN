@@ -1,53 +1,89 @@
 import numpy as np
 import pandas as pd
+import joblib
 from sklearn.preprocessing import StandardScaler
 
 
-def create_sliding_windows(df, window_size=100, prediction_horizon=500):
+def create_sliding_windows(df, window_size=100, prediction_horizon=500,
+                           min_move_pct=0.0):
     df = df.copy()
+
     df['price_change'] = df['price'].pct_change()
     df['volume_ma'] = df['size'].rolling(window=20).mean()
     df['price_volatility'] = df['price'].rolling(window=20).std()
-    df['trade_intensity'] = df['size'] / df['size'].rolling(window=20).mean()
+
+    rolling_mean = df['size'].rolling(window=20).mean()
+    df['trade_intensity'] = np.where(
+        rolling_mean > 0,
+        df['size'] / rolling_mean,
+        1.0
+    )
 
     df['price_ma_5'] = df['price'].rolling(window=5).mean()
     df['price_ma_20'] = df['price'].rolling(window=20).mean()
     df['ma_crossover'] = (df['price_ma_5'] > df['price_ma_20']).astype(int)
-    
+
+    df['momentum_10'] = df['price'].pct_change(10)
+    df['momentum_50'] = df['price'].pct_change(50)
+
+    df['volume_change'] = df['size'].pct_change()
+    df['volume_spike'] = (df['size'] > df['volume_ma'] * 2.0).astype(int)
+
+    df = df.replace([np.inf, -np.inf], np.nan)
     df = df.dropna()
-    
+
     df['future_price'] = df['price'].shift(-prediction_horizon)
-    df['target'] = (df['future_price'] > df['price']).astype(int)
+    df['future_return'] = (df['future_price'] - df['price']) / df['price']
+    df['target'] = (df['future_return'] > min_move_pct).astype(int)
+
+    df = df.replace([np.inf, -np.inf], np.nan)
+    df = df.dropna()
     df = df[:-prediction_horizon]
-    
-    features = ['price', 'size', 'price_change', 'volume_ma','price_volatility', 'trade_intensity']
-    
+
+    print(f"Target distribution - Down: {sum(df['target']==0):,}, Up: {sum(df['target']==1):,}")
+    print(f"Up ratio: {df['target'].mean()*100:.1f}%")
+
+    features = [
+        'price', 'size', 'price_change', 'volume_ma', 'price_volatility',
+        'trade_intensity', 'ma_crossover', 'momentum_10', 'momentum_50',
+        'volume_change', 'volume_spike'
+    ]
+
     X, y = [], []
-    
     for i in range(len(df) - window_size):
-        window = df[features].iloc[i:i+window_size].values
-        X.append(window)
-        target = df['target'].iloc[i+window_size]
-        y.append(target)
-    
+        window = df[features].iloc[i:i + window_size].values
+        if not (np.isnan(window).any() or np.isinf(window).any()):
+            X.append(window)
+            y.append(df['target'].iloc[i + window_size])
+
+    print(f"{len(X):,} clean windows created")
     return np.array(X), np.array(y)
 
 
-def prepare_train_test_split(X, y, train_ratio=0.8):
+def prepare_train_test_split(X, y, train_ratio=0.8, scaler_path='scaler.pkl'):
     split_idx = int(len(X) * train_ratio)
-    
-    X_train = X[:split_idx]
-    y_train = y[:split_idx]
-    X_test = X[split_idx:]
-    y_test = y[split_idx:]
-    
+
+    X_train, X_test = X[:split_idx], X[split_idx:]
+    y_train, y_test = y[:split_idx], y[split_idx:]
+
+    X_train = np.clip(X_train, -1e9, 1e9)
+    X_test = np.clip(X_test, -1e9, 1e9)
+
+    assert not np.isnan(X_train).any(), "NaN found in X_train after clipping"
+    assert not np.isinf(X_train).any(), "Inf found in X_train after clipping"
+    assert not np.isnan(X_test).any(), "NaN found in X_test after clipping"
+    assert not np.isinf(X_test).any(), "Inf found in X_test after clipping"
+
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(
         X_train.reshape(-1, X_train.shape[-1])
     ).reshape(X_train.shape)
-    
+
     X_test_scaled = scaler.transform(
         X_test.reshape(-1, X_test.shape[-1])
     ).reshape(X_test.shape)
-    
+
+    joblib.dump(scaler, scaler_path)
+    print(f"Scaler saved to {scaler_path}")
+
     return X_train_scaled, X_test_scaled, y_train, y_test
