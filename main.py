@@ -1,8 +1,8 @@
 import os
+import pandas as pd
 from datetime import datetime
 import numpy as np
 
-from src.data.data_acquisition import download_nasdaq_data
 from src.feature_engineering.engineering import create_sliding_windows, prepare_train_test_split
 from src.model.model import build_cnn_model
 from src.model.train import prepare_training_data, train_model, get_callbacks
@@ -18,14 +18,27 @@ from src.utils.visualise import (
 )
 
 
+DATA_FILE = "data/processed/nasdaq_trades.csv"
+
+
+def load_data(filepath):
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(
+            f"\nData file not found: {filepath}\n"
+        )
+    print(f"Loading data from {filepath}...")
+    df = pd.read_csv(filepath, index_col=0, parse_dates=True)
+    print(f"{len(df):,} trades loaded")
+    print(f"  Date range: {df.index.min()} → {df.index.max()}")
+    print(f"  Symbols:    {df['symbol'].unique().tolist()}")
+    return df
+
+
 def main():
     print("CNN Trade Execution Prediction Pipeline")
 
     config = {
-        'symbols': ["ANET"],
-        'start_date': datetime(2026, 1, 14),
-        'end_date': datetime(2026, 2, 14),
-        'output_file': 'nasdaq_trades.csv',
+        'data_file': DATA_FILE,
         'window_size': 100,
         'prediction_horizon': 100,
         'min_move_pct': 0.0,
@@ -42,15 +55,10 @@ def main():
         'volume_change', 'volume_spike'
     ]
 
-    print(f"Symbol: {config['symbols']} | {config['start_date'].date()} → {config['end_date'].date()}")
-    df = download_nasdaq_data(
-        symbols=config['symbols'],
-        start_date=config['start_date'],
-        end_date=config['end_date'],
-        output_file=config['output_file']
-    )
-    print(f"{len(df):,} trades downloaded")
+    print(f"\nLoading Data")
+    df = load_data(config['data_file'])
 
+    print(f"\nFeature Engineering")
     all_X, all_y, all_symbols = [], [], []
 
     for symbol in df['symbol'].unique():
@@ -67,18 +75,21 @@ def main():
 
     X_combined = np.vstack(all_X)
     y_combined = np.hstack(all_y)
-    print(f"{len(X_combined):,} windows | shape: {X_combined.shape}")
+    print(f"✓ {len(X_combined):,} windows | shape: {X_combined.shape}")
 
+    print(f"\nTrain/Test Split")
     X_train, X_test, y_train, y_test = prepare_train_test_split(
         X_combined, y_combined,
         train_ratio=config['train_test_split']
     )
     print(f"Train: {len(X_train):,} | Test: {len(X_test):,}")
 
+    print(f"\nPreparing Training Data")
     X_train, y_train, class_weight_dict = prepare_training_data(
         X_train, y_train, use_smote=config['use_smote']
     )
 
+    print(f"\nBuilding and Training CNN")
     input_shape = (X_train.shape[1], X_train.shape[2])
     model = build_cnn_model(input_shape)
     model.summary()
@@ -94,6 +105,7 @@ def main():
         callbacks=callbacks
     )
 
+    print(f"\nEvaluation")
     metrics, y_pred, y_pred_proba = evaluate_model(model, X_test, y_test)
 
     np.savez_compressed(
@@ -104,7 +116,6 @@ def main():
     )
     model.save('nasdaq_cnn_model.keras')
     np.save('training_history.npy', history.history)
-    print("Saved all artifacts")
 
     plot_training_history(history)
     evaluate_predictions(y_test, y_pred)
@@ -114,7 +125,6 @@ def main():
     analyse_feature_importance(model, X_test, feature_names)
     plot_prediction_heatmap(y_test, y_pred)
 
-    print("Pipeline Complete")
     print(f"ROC AUC:  {metrics['roc_auc']:.4f}")
     print(f"Accuracy: {metrics['accuracy']:.2%}")
     print(f"Recall:   {metrics['recall']:.4f}")
