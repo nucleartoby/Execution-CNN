@@ -54,7 +54,7 @@ def build_cnn_model(input_shape):
 
     model.compile(
         optimizer=keras.optimizers.Adam(learning_rate=0.0003),
-        loss=focal_loss(gamma=2.0, alpha=0.60),
+        loss=focal_loss(gamma=2.0, alpha=0.50),
         metrics=[
             'accuracy',
             keras.metrics.Precision(name='precision'),
