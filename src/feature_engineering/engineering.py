@@ -4,39 +4,25 @@ import joblib
 from sklearn.preprocessing import StandardScaler
 
 
-def create_sliding_windows(df, window_size=100, prediction_horizon=500,
-                           min_move_pct=0.0):
+def create_sliding_windows(df, window_size=100, prediction_horizon=500, min_move_pct=0.003):
     df = df.copy()
 
     df['price_change'] = df['price'].pct_change()
     df['volume_ma'] = df['size'].rolling(window=20).mean()
     df['price_volatility'] = df['price'].rolling(window=20).std()
-
-    rolling_mean = df['size'].rolling(window=20).mean()
-    df['trade_intensity'] = np.where(
-        rolling_mean > 0,
-        df['size'] / rolling_mean,
-        1.0
-    )
-
+    df['trade_intensity'] = df['size'] / df['size'].rolling(window=20).mean()
     df['price_ma_5'] = df['price'].rolling(window=5).mean()
     df['price_ma_20'] = df['price'].rolling(window=20).mean()
     df['ma_crossover'] = (df['price_ma_5'] > df['price_ma_20']).astype(int)
-
     df['momentum_10'] = df['price'].pct_change(10)
     df['momentum_50'] = df['price'].pct_change(50)
-
     df['volume_change'] = df['size'].pct_change()
     df['volume_spike'] = (df['size'] > df['volume_ma'] * 2.0).astype(int)
-
-    df = df.replace([np.inf, -np.inf], np.nan)
     df = df.dropna()
 
     df['future_price'] = df['price'].shift(-prediction_horizon)
     df['future_return'] = (df['future_price'] - df['price']) / df['price']
     df['target'] = (df['future_return'] > min_move_pct).astype(int)
-
-    df = df.replace([np.inf, -np.inf], np.nan)
     df = df.dropna()
     df = df[:-prediction_horizon]
 
@@ -49,15 +35,19 @@ def create_sliding_windows(df, window_size=100, prediction_horizon=500,
         'volume_change', 'volume_spike'
     ]
 
-    X, y = [], []
-    for i in range(len(df) - window_size):
-        window = df[features].iloc[i:i + window_size].values
-        if not (np.isnan(window).any() or np.isinf(window).any()):
-            X.append(window)
-            y.append(df['target'].iloc[i + window_size])
+    data = df[features].values.astype(np.float32)   # (N, F)
+    targets = df['target'].values                     # (N,)
 
-    print(f"{len(X):,} clean windows created")
-    return np.array(X), np.array(y)
+    n_samples = len(data) - window_size
+    n_features = data.shape[1]
+
+    shape   = (n_samples, window_size, n_features)
+    strides = (data.strides[0], data.strides[0], data.strides[1])
+    X = np.lib.stride_tricks.as_strided(data, shape=shape, strides=strides).copy()
+    y = targets[window_size:window_size + n_samples]
+
+    print(f"Windows created: {len(X):,}  shape: {X.shape}")
+    return X, y
 
 
 def prepare_train_test_split(X, y, train_ratio=0.8, scaler_path='scaler.pkl'):
