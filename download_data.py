@@ -9,8 +9,8 @@ from alpaca.data.requests import StockTradesRequest
 load_dotenv()
 
 SYMBOLS = ["ANET"]
-START_DATE = datetime(2026, 1, 5)
-END_DATE = datetime(2026, 2, 5)
+START_DATE = datetime(2025, 10, 5)
+END_DATE = datetime(2026, 2, 20)
 RAW_DIR = "data/raw"
 OUTPUT_FILE = "data/processed/nasdaq_trades.csv"
 DELAY_SECONDS = 3  #keep for rate limit pause
