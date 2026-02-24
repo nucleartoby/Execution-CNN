@@ -9,7 +9,7 @@ from alpaca.data.requests import StockTradesRequest
 load_dotenv()
 
 SYMBOLS = ["ANET"]
-START_DATE = datetime(2025, 10, 5)
+START_DATE = datetime(2025, 7, 5)
 END_DATE = datetime(2026, 2, 20)
 RAW_DIR = "data/raw"
 OUTPUT_FILE = "data/processed/nasdaq_trades.csv"
