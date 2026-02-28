@@ -19,42 +19,53 @@ def focal_loss(gamma=2.0, alpha=0.75):
     return loss_fn
 
 
-def build_cnn_model(input_shape):
+def build_cnn_model(input_shape, l2_reg=0.001, dropout_rate=0.4, focal_alpha=0.60):
     model = keras.Sequential([
         layers.Conv1D(
-            filters=32, kernel_size=5, activation='relu',
-            input_shape=input_shape, padding='same',
-            kernel_regularizer=regularizers.l2(0.001)
+            filters=32, 
+            kernel_size=5, 
+            activation='relu',
+            input_shape=input_shape, 
+            padding='same',
+            kernel_regularizer=regularizers.l2(l2_reg)
         ),
         layers.BatchNormalization(),
         layers.MaxPooling1D(pool_size=2),
-        layers.Dropout(0.3),
+        layers.Dropout(dropout_rate),
 
         layers.Conv1D(
-            filters=64, kernel_size=3, activation='relu',
+            filters=64, 
+            kernel_size=3, 
+            activation='relu',
             padding='same',
-            kernel_regularizer=regularizers.l2(0.001)
+            kernel_regularizer=regularizers.l2(l2_reg)
         ),
         layers.BatchNormalization(),
         layers.MaxPooling1D(pool_size=2),
-        layers.Dropout(0.3),
+        layers.Dropout(dropout_rate),
 
         layers.Conv1D(
-            filters=64, kernel_size=3, activation='relu',
+            filters=64, 
+            kernel_size=3, 
+            activation='relu',
             padding='same',
-            kernel_regularizer=regularizers.l2(0.001)
+            kernel_regularizer=regularizers.l2(l2_reg)
         ),
         layers.BatchNormalization(),
         layers.GlobalAveragePooling1D(),
 
-        layers.Dense(32, activation='relu', kernel_regularizer=regularizers.l2(0.001)),
-        layers.Dropout(0.4),
+        layers.Dense(
+            32, 
+            activation='relu', 
+            kernel_regularizer=regularizers.l2(l2_reg)
+        ),
+        layers.Dropout(dropout_rate),
         layers.Dense(1, activation='sigmoid')
     ])
 
     model.compile(
         optimizer=keras.optimizers.Adam(learning_rate=0.0003),
-        loss=focal_loss(gamma=2.0, alpha=0.60),
+        loss=focal_loss(gamma=2.0, alpha=focal_alpha),
         metrics=[
             'accuracy',
             keras.metrics.Precision(name='precision'),
