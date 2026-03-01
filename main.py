@@ -48,7 +48,6 @@ def main():
         "focal_alpha": 0.60,
     }
 
-    # Memory control
     MAX_ROWS = 5_000_000   # max trades per symbol
     STRIDE = 10            # keep every 10th trade
 
@@ -119,7 +118,7 @@ def main():
     metrics, y_pred, y_pred_proba = evaluate_model(model, X_test, y_test)
 
     high_conf_threshold = 0.75
-    high_conf_up = y_pred_proba.flatten() > high_conf_threshold  # flatten() extracts probabilities
+    high_conf_up = y_pred_proba.flatten() > high_conf_threshold
     high_conf_correct = np.mean(y_test[high_conf_up])
     high_conf_count = np.sum(high_conf_up)
     print(f"  Precision: {high_conf_correct:.3f} ({np.sum(y_test[high_conf_up])}/{high_conf_count})")
