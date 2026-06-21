@@ -65,7 +65,11 @@ def build_cnn_model(input_shape, l2_reg=0.001, dropout_rate=0.4, focal_alpha=0.6
 
     model.compile(
         optimizer=keras.optimizers.Adam(learning_rate=0.0003),
+<<<<<<< Updated upstream
         loss=focal_loss(gamma=2.0, alpha=focal_alpha),
+=======
+        loss=focal_loss(gamma=2.0, alpha=0.50),
+>>>>>>> Stashed changes
         metrics=[
             'accuracy',
             keras.metrics.Precision(name='precision'),
