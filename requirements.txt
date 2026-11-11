@@ -3,4 +3,5 @@ pandas
 scikit-learn
 tensorflow
 matplotlib
-yfinance
+alpaca-py
+python-dotenv
