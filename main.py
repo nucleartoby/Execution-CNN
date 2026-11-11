@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 
-from src.feature_engineering.engineering import create_sliding_windows, prepare_train_test_split
+from src.feature_engineering.engineering import build_day_windows, prepare_train_test_split
 from src.model.model import build_cnn_model
 from src.model.train import prepare_training_data, train_model, get_callbacks
 from src.model.evaluate import evaluate_model
@@ -13,8 +13,7 @@ from src.utils.visualise import (
     plot_predictions_over_time,
     plot_performance_curves,
     analyse_feature_importance,
-    plot_prediction_heatmap,
-)
+    plot_prediction_heatmap,)
 
 DATA_FILE = "data/processed/nasdaq_trades.csv"
 
@@ -41,21 +40,17 @@ def main():
         "train_test_split": 0.8,
         "epochs": 50,
         "batch_size": 64,
-        "use_smote": False,
-        "confidence_threshold": 0.55,
         "l2_reg": 0.001,
         "dropout_rate": 0.4,
-        "focal_alpha": 0.60,
-    }
+        "focal_alpha": 0.5,}    # neutral class weights do the balancing
 
     MAX_ROWS = 5_000_000   # max trades per symbol
-    STRIDE = 10            # keep every 10th trade
+    STRIDE = 10            # trades per bar
 
     feature_names = [
         "price", "size", "price_change", "volume_ma", "price_volatility",
         "trade_intensity", "ma_crossover", "momentum_10", "momentum_50",
-        "volume_change", "volume_spike",
-    ]
+        "volume_change", "volume_spike",]
 
     df = load_data(config["data_file"])
 
@@ -64,14 +59,14 @@ def main():
     for symbol in df["symbol"].unique():
         df_symbol = df[df["symbol"] == symbol].copy()
         df_symbol = df_symbol.iloc[:MAX_ROWS].copy()
-        df_symbol = df_symbol.iloc[::STRIDE].copy()
 
-        X, y = create_sliding_windows(
+        X, y = build_day_windows(
             df_symbol,
             window_size=config["window_size"],
             prediction_horizon=config["prediction_horizon"],
             min_move_pct=config["min_move_pct"],
-        )
+            stride=STRIDE,)
+        
         all_X.append(X)
         all_y.append(y)
         all_symbols.extend([symbol] * len(X))
@@ -84,22 +79,17 @@ def main():
         X_combined,
         y_combined,
         train_ratio=config["train_test_split"],
-    )
+        gap=config["prediction_horizon"],)
     print(f"Train: {len(X_train):,} | Test: {len(X_test):,}")
 
-    X_train, y_train, class_weight_dict = prepare_training_data(
-        X_train,
-        y_train,
-        use_smote=config["use_smote"],
-    )
+    X_train, y_train, class_weight_dict = prepare_training_data(X_train, y_train)
 
     input_shape = (X_train.shape[1], X_train.shape[2])
     model = build_cnn_model(
         input_shape,
         l2_reg=config["l2_reg"],
         dropout_rate=config["dropout_rate"],
-        focal_alpha=config["focal_alpha"],
-    )
+        focal_alpha=config["focal_alpha"],)
     model.summary()
 
     callbacks = get_callbacks(monitor="val_auc", patience=10)
@@ -112,17 +102,17 @@ def main():
         batch_size=config["batch_size"],
         class_weight_dict=class_weight_dict,
         validation_split=0.2,
-        callbacks=callbacks,
-    )
+        callbacks=callbacks,)
 
     metrics, y_pred, y_pred_proba = evaluate_model(model, X_test, y_test)
 
-    high_conf_threshold = 0.75
-    high_conf_up = y_pred_proba.flatten() > high_conf_threshold
-    high_conf_correct = np.mean(y_test[high_conf_up])
-    high_conf_count = np.sum(high_conf_up)
-    print(f"  Precision: {high_conf_correct:.3f} ({np.sum(y_test[high_conf_up])}/{high_conf_count})")
-    print(f"  Hit rate:  {high_conf_count/len(y_test)*100:.1f}% of predictions")
+    scores = y_pred_proba.flatten()
+    print(f"\nBase rate (Up): {y_test.mean():.3f}")
+    for q in (0.99, 0.95):
+        flagged = scores >= np.quantile(scores, q)
+        print(
+            f"  Top {100 * (1 - q):.0f}% by score: hit rate {y_test[flagged].mean():.3f} "
+            f"({int(y_test[flagged].sum())}/{int(flagged.sum())}), coverage {flagged.mean()*100:.1f}%")
 
     np.savez_compressed(
         "processed_data.npz",
@@ -130,8 +120,8 @@ def main():
         X_test=X_test,
         y_train=y_train,
         y_test=y_test,
-        symbols=all_symbols,
-    )
+        symbols=all_symbols,)
+    
     model.save("nasdaq_cnn_model.keras")
     np.save("training_history.npy", history.history)
 
