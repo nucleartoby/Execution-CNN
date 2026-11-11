@@ -2,6 +2,7 @@ import os
 import time
 import pandas as pd
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 from alpaca.data import StockHistoricalDataClient
 from alpaca.data.requests import StockTradesRequest
@@ -14,6 +15,7 @@ END_DATE = datetime(2026, 2, 27)
 RAW_DIR = "data/raw"
 OUTPUT_FILE = "data/processed/nasdaq_trades.csv"
 DELAY_SECONDS = 3  #keep for rate limit pause
+NEW_YORK = ZoneInfo("America/New_York")
 
 
 def get_trading_days(start, end):
@@ -36,14 +38,13 @@ def download_day(client, symbols, date):
         return filepath
 
     try:
-        start = datetime(date.year, date.month, date.day, 13, 30)
-        end = datetime(date.year, date.month, date.day, 20, 0)
+        start = datetime(date.year, date.month, date.day, 9, 30, tzinfo=NEW_YORK)
+        end = datetime(date.year, date.month, date.day, 16, 0, tzinfo=NEW_YORK)
 
         request = StockTradesRequest(
             symbol_or_symbols=symbols,
             start=start,
-            end=end
-        )
+            end=end)
         trades = client.get_stock_trades(request)
         df = trades.df.reset_index(level='symbol', drop=False)
 
@@ -61,11 +62,10 @@ def download_day(client, symbols, date):
 
 
 def merge_raw_files():
-    os.makedirs("src/data/processed", exist_ok=True)
+    os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
     raw_files = sorted([
         f"{RAW_DIR}/{f}" for f in os.listdir(RAW_DIR)
-        if f.endswith('.csv')
-    ])
+        if f.endswith('.csv')])
 
     if not raw_files:
         raise FileNotFoundError(f"No files in {RAW_DIR}")
@@ -93,8 +93,7 @@ def merge_raw_files():
 def main():
     client = StockHistoricalDataClient(
         os.getenv("ALPACA_API_KEY"),
-        os.getenv("ALPACA_SECRET_KEY")
-    )
+        os.getenv("ALPACA_SECRET_KEY"))
 
     trading_days = get_trading_days(START_DATE, END_DATE)
     print(f"Downloading {len(trading_days)} trading days for {SYMBOLS}")
